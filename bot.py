@@ -7,18 +7,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
-    Message, CallbackQuery, InputMediaPhoto,
-    InlineKeyboardMarkup, InlineKeyboardButton,
+    Message, CallbackQuery, InputMediaPhoto, 
+    InlineKeyboardMarkup, InlineKeyboardButton, 
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 )
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.client.session.aiohttp import AiohttpSession
 
 # --- ⚙️ ВАШИ НАСТРОЙКИ ---
-TOKEN = "8586666424:AAHneQ_M9esmiq1_OhByXfk4fnHJWKWn5DI"
-SUPERADMIN_ID = 6269786133
-CHANNEL_ID = -1002347138762
+TOKEN = "8586666424:AAHneQ_M9esmiq1_OhByXfk4fnHJWKWn5DI" 
+SUPERADMIN_ID = 6269786133       
+CHANNEL_ID = -1003406664819      
 
 # --- 📁 БАЗА ДАННЫХ (SQLite) ---
 def init_db():
@@ -98,12 +97,9 @@ def delete_collab_button(btn_id):
     conn.commit()
     conn.close()
 
-# --- 🤖 ИНИЦИАЛИЗАЦИЯ БОТА ---
-session = AiohttpSession(proxy="http://proxy.server:3128")
-
+# --- 🤖 ИНИЦИАЛИЗАЦИЯ БОТА (ЧИСТАЯ, БЕЗ ПРОКСИ) ---
 bot = Bot(
-    token=TOKEN,
-    session=session,
+    token=TOKEN, 
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
 dp = Dispatcher(storage=MemoryStorage())
@@ -170,7 +166,7 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     add_user_db(message.from_user.id)
     await message.answer(
-        "👋 Привет! Я бот для предложки.\nВыберите действие в меню:",
+        "👋 Привет! Я бот для предложки.\nВыберите действие в меню:", 
         reply_markup=main_menu_kb(message.from_user.id)
     )
 
@@ -214,7 +210,7 @@ async def finish_photos(message: Message, state: FSMContext):
 
 @router.message(PostState.waiting_for_photos)
 async def wrong_type_photo(message: Message):
-    if message.text not in ["✅ Да", "❌ Нет"]:
+    if message.text not in ["✅ Да", "❌ Нет"]: 
         await message.answer("❌ Пришлите фото или нажмите кнопку 'Готово'.")
 
 async def show_preview(message: Message, state: FSMContext):
@@ -226,7 +222,7 @@ async def show_preview(message: Message, state: FSMContext):
         await message.answer(preview_text, reply_markup=pre_publish_kb())
     await state.set_state(PostState.confirm)
 
-# --- МОДЕРАЦИЯ (С ЗАПОМИНАНИЕМ СООБЩЕНИЙ) ---
+# --- МОДЕРАЦИЯ ---
 @router.callback_query(F.data == "cancel_post")
 async def cancel_post(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -237,16 +233,16 @@ async def cancel_post(callback: CallbackQuery, state: FSMContext):
 async def send_to_moderation(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     user_id = callback.from_user.id
-
+    
     if not hasattr(bot, 'pending_posts'): bot.pending_posts = {}
-
+    
     # Добавляем список для хранения ID сообщений у админов
-    data['admin_messages'] = []
-    bot.pending_posts[user_id] = data
-
+    data['admin_messages'] = [] 
+    bot.pending_posts[user_id] = data 
+    
     admins = get_admins()
     text = f"📩 <b>Новое объявление</b> от {callback.from_user.full_name} (ID: {user_id})\n\n{data['text']}"
-
+    
     sent_count = 0
     for admin_id in admins:
         try:
@@ -255,10 +251,10 @@ async def send_to_moderation(callback: CallbackQuery, state: FSMContext):
                 msg = await bot.send_photo(admin_id, photo=data['photos'][0], caption=text, reply_markup=admin_mod_kb(user_id))
             else:
                 msg = await bot.send_message(admin_id, text, reply_markup=admin_mod_kb(user_id))
-
+            
             if msg:
                 bot.pending_posts[user_id]['admin_messages'].append((admin_id, msg.message_id))
-
+            
             sent_count += 1
         except Exception as e:
             print(f"Ошибка отправки админу {admin_id}: {e}")
@@ -287,29 +283,27 @@ async def edit_post_finish(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     user_id = data.get('editing_user_id')
-
+    
     if hasattr(bot, 'pending_posts') and user_id in bot.pending_posts:
         bot.pending_posts[user_id]['text'] = message.text
         updated_data = bot.pending_posts[user_id]
-
         new_text = f"📩 <b>Объявление (ОТРЕДАКТИРОВАНО ВАМИ)</b>\nАвтор: ID {user_id}\n\n{updated_data['text']}"
-
+        
         if updated_data['photos']:
              await message.answer_photo(photo=updated_data['photos'][0], caption=new_text, reply_markup=admin_mod_kb(user_id))
         else:
              await message.answer(new_text, reply_markup=admin_mod_kb(user_id))
-
         await message.answer("✅ Текст изменен! Опубликуйте в новом сообщении.")
     else:
         await message.answer("⚠️ Пост не найден.")
     await state.clear()
 
-# --- ПРИНЯТИЕ РЕШЕНИЯ (С СИНХРОНИЗАЦИЕЙ) ---
+# --- ПРИНЯТИЕ РЕШЕНИЯ ---
 @router.callback_query(F.data.startswith("approve_") | F.data.startswith("reject_"))
 async def mod_decision(callback: CallbackQuery):
     action, author_id = callback.data.split("_")
     author_id = int(author_id)
-
+    
     if not hasattr(bot, 'pending_posts') or author_id not in bot.pending_posts:
         await callback.answer("⚠️ Пост устарел.", show_alert=True)
         try: await callback.message.edit_reply_markup(reply_markup=None)
@@ -323,7 +317,7 @@ async def mod_decision(callback: CallbackQuery):
         try: await bot.send_message(author_id, "❌ Ваше объявление отклонено.")
         except: pass
         final_text = f"❌ <b>Отклонено</b> админом {admin_name}"
-
+    
     elif action == "approve":
         try:
             if post_data['photos']:
@@ -335,25 +329,25 @@ async def mod_decision(callback: CallbackQuery):
                     await bot.send_media_group(CHANNEL_ID, media=media)
             else:
                 await bot.send_message(CHANNEL_ID, post_data['text'])
-
+            
             await bot.send_message(author_id, "✅ Ваше объявление опубликовано!")
             final_text = f"✅ <b>Опубликовано</b> админом {admin_name}"
         except Exception as e:
             await callback.message.answer(f"❌ Ошибка публикации: {e}")
             final_text = f"⚠️ Ошибка публикации ({admin_name})"
 
-    # СИНХРОНИЗАЦИЯ: Удаляем кнопки у ВСЕХ админов
+    # СИНХРОНИЗАЦИЯ: Удаляем кнопки у всех админов
     messages_to_edit = post_data.get('admin_messages', [])
     for adm_chat_id, adm_msg_id in messages_to_edit:
         try:
             await bot.edit_message_reply_markup(chat_id=adm_chat_id, message_id=adm_msg_id, reply_markup=None)
         except Exception as e:
-            print(f"Не удалось обновить сообщение у админа {adm_chat_id}: {e}")
+            print(f"Не удалось обновить у админа {adm_chat_id}: {e}")
 
     await callback.message.answer(final_text)
     del bot.pending_posts[author_id]
 
-# --- СОТРУДНИЧЕСТВО (ВЕРНУЛ КНОПКУ!) ---
+# --- СОТРУДНИЧЕСТВО ---
 @router.message(F.text == "🤝 Сотрудничество")
 async def collaboration_menu(message: Message):
     buttons_data = get_collab_buttons()
@@ -364,7 +358,7 @@ async def collaboration_menu(message: Message):
         kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
         if not buttons_data: await message.answer("Раздел пока пуст.")
         else: await message.answer("🤝 Наши контакты и партнеры:", reply_markup=kb)
-    except: await message.answer("⚠️ Ошибка кнопки. Удалите последнюю добавленную в админке.")
+    except: await message.answer("⚠️ Ошибка. Удалите последнюю кнопку в админке.")
 
 # --- РАССЫЛКА ---
 @router.callback_query(F.data == "start_broadcast")
@@ -381,7 +375,7 @@ async def process_broadcast(message: Message, state: FSMContext):
         return
     users = get_all_users()
     if not users:
-        await message.answer("⚠️ В базе пока нет пользователей (кроме админов).")
+        await message.answer("⚠️ В базе пока нет пользователей.")
         await state.clear()
         return
     await message.answer(f"⏳ Начинаю рассылку на {len(users)} пользователей...")
@@ -468,7 +462,7 @@ async def close_panel(callback: CallbackQuery):
 # --- ЗАПУСК ---
 async def main():
     init_db()
-    print("🤖 Бот запущен! (Final Version 6.1)")
+    print("🤖 Бот запущен! (Clean Host Version)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
